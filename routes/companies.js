@@ -8,11 +8,11 @@ let router = new express.Router();
 router.get('/', async (req, res, next) => {
     try {
         const result = await db.query(
-            `SELECT code, name
+            `SELECT code, name, description
             FROM companies
             ORDER BY name`
         );
-        return res.json({"compaies": result.rows});
+        return res.json({"companies": result.rows});
     }
     catch (err) {
         return next(err);
@@ -24,17 +24,32 @@ router.get('/:code', async (req, res, next) => {
         let code = req.params.code;
 
         const compResult = await db.query(
-            `SELECT code, name, description
+            `SELECT code, name
             FROM companies
             WHERE code = $1`, [code]
         );
         const invResult = await db.query(
             `SELECT id
             FROM invoices
-            WHERE code = $1`, [code]
+            WHERE comp_code = $1`, [code]
         );
+        
+        const result = await db.query(
+            `SELECT c.code, c.name, c.description, i.industry
+            FROM companies AS c
+            LEFT JOIN companies_industries AS ci
+            ON c.code = ci.company_code
+            LEFT JOIN industries AS i
+            ON ci.industries_id = i.ind_code
+            WHERE c.code = $1`, [req.params.code]
+        );
+        let { com, name } = result.rows[0];
+        let industries = result.rows.map(r => r.industry);
 
-        if (compResults.rows.length === 0) {
+        return res.json({ com, name, industries});
+
+
+        if (compResult.rows.length === 0) {
             throw new ExpressError(`not found ${code}`, 404);
         }
         const company = compResult.rows[0];
